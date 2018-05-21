@@ -1,0 +1,79 @@
+---
+title: "PA:PML"
+author: "vincent trouillet"
+date: "21/05/2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## RESUME
+
+
+## IMPORT & DATA LOADING
+```{r import, echo=True}
+library(ggplot2)
+library(caret)
+library(fscaret)
+library(randomForest)
+library(e1071)
+```
+
+```{r Dataloading, echo=True}
+download.file("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv","pml-traing.csv")
+download.file("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv","pml-testing.csv")
+```
+
+## DATA CLEANING
+
+
+```{r datacleaning1, echo=True}
+training <- read.table("pml-training.csv", sep = ",", header = TRUE)
+testing <- read.table("pml-testing.csv", sep = ",", header = TRUE)
+```
+
+```{r datacleaning2, echo=True}
+nzv <- nearZeroVar(training)
+trainingMOD <- training[,-nzv]
+testingMOD <- testing[,-nzv]
+```
+
+```{r datacleaning3, echo=True}
+trainingMOD <- trainingMOD[, colSums(is.na(trainingMOD)) == 0]
+testingMOD <- testingMOD[, colSums(is.na(testingMOD)) == 0]
+```
+
+```{r datacleaning4, echo=True}
+trainingMOD <- trainingMOD[, -(1:5)]
+testingMOD <- testingMOD[, -(1:5)]
+```
+
+## DATASET PARTITIONING
+```{r dataPartition, echo=True}
+nTrain = createDataPartition(trainingMOD$classe, p=0.70, list=F)
+TrainingSet <- trainingMOD[nTrain,]
+ValidingSet <- trainingMOD[-nTrain,]
+```
+
+## MODEL
+```{r Model1, echo=True}
+RFmodel <- train(classe ~., method = "rf", data = TrainingSet, verbose = TRUE, trControl = trainControl(method="cv"), number = 3)
+```
+
+```{r Model2, echo=True}
+pred_TS <- predict(RFmodel, TrainingSet)
+confusionMatrix(pred_TS, TrainingSet$classe)
+```
+
+```{r Model3, echo=True}
+pred_VS <- predict(RFmodel, ValidingSet)
+confusionMatrix(pred_VS, ValidingSet$classe)
+```
+
+## PREDICTION
+```{r prediction, echo=True}
+prediction <- predict(RFmodel, testingMOD)
+prediction
+```
