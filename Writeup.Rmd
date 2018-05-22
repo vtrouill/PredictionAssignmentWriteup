@@ -9,71 +9,111 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## RESUME
-
+## summary
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, the data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants should be use to predict the manner in which they did the exercise. This is the "classe" variable in the training set. 
 
 ## IMPORT & DATA LOADING
-```{r import, echo=True}
+```{r import, echo=TRUE}
 library(ggplot2)
 library(caret)
+library(rpart)
 library(fscaret)
 library(randomForest)
 library(e1071)
 ```
-
-```{r Dataloading, echo=True}
-download.file("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv","pml-traing.csv")
+First download the data :
+```{r Dataloading, echo=TRUE}
+download.file("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv","pml-training.csv")
 download.file("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv","pml-testing.csv")
 ```
 
 ## DATA CLEANING
 
-
-```{r datacleaning1, echo=True}
+we read The tables.
+```{r datacleaning1, echo=TRUE}
 training <- read.table("pml-training.csv", sep = ",", header = TRUE)
 testing <- read.table("pml-testing.csv", sep = ",", header = TRUE)
 ```
 
-```{r datacleaning2, echo=True}
+Classes are not present in the test model. it's what we have to predict.
+
+Many columns of the data set contain the same value accros the lines. These "near-zero variance predictors"" bring almost no information to our model and will make computing unnecessarily longer. So we remove near zero precdictaor from both training and testing sets.
+
+```{r datacleaning2, echo=TRUE}
 nzv <- nearZeroVar(training)
 trainingMOD <- training[,-nzv]
 testingMOD <- testing[,-nzv]
 ```
 
-```{r datacleaning3, echo=True}
+In the same idea, du to a lot N/A datas, the impacted columns are removed too.
+
+```{r datacleaning3, echo=TRUE}
 trainingMOD <- trainingMOD[, colSums(is.na(trainingMOD)) == 0]
 testingMOD <- testingMOD[, colSums(is.na(testingMOD)) == 0]
 ```
 
-```{r datacleaning4, echo=True}
+Finaly, the six first variables do not concern fitness motions whatsoever. They also need to be remove before we start fitting our model.
+
+```{r datacleaning4, echo=TRUE}
 trainingMOD <- trainingMOD[, -(1:5)]
 testingMOD <- testingMOD[, -(1:5)]
+dim(trainingMOD)
+dim(testingMOD)
 ```
 
 ## DATASET PARTITIONING
-```{r dataPartition, echo=True}
+we set the seed to make this analysis reproducible and we split the modified training set into a training set and a validation set 
+
+```{r dataPartition, echo=TRUE}
+set.seed(421)
 nTrain = createDataPartition(trainingMOD$classe, p=0.70, list=F)
 TrainingSet <- trainingMOD[nTrain,]
 ValidingSet <- trainingMOD[-nTrain,]
 ```
+## MODEL 1
 
-## MODEL
-```{r Model1, echo=True}
+We just try a first model with a decision tree. 
+
+
+```{r Model-1, echo=TRUE}
+TREEModel <- rpart(classe ~., data=TrainingSet, method="class")
+pred_TS <- predict(TREEModel, TrainingSet, type="class")
+confusionMatrix(pred_TS, TrainingSet$classe)
+```
+
+```{r Model-2, echo=TRUE}
+pred_TV <- predict(TREEModel, ValidingSet, type="class")
+confusionMatrix(pred_TV, ValidingSet$classe)
+```
+in this case, the accuracy is around 72%. so let try an another model to reach a better accuracy
+
+## MODEL 2
+
+Now, we chose to fit a random forest model. This model provided a most accurate model than the decision tree.The cross-validation is set to draw a subset of the data three different times.
+
+```{r Model1, echo=TRUE}
 RFmodel <- train(classe ~., method = "rf", data = TrainingSet, verbose = TRUE, trControl = trainControl(method="cv"), number = 3)
 ```
 
-```{r Model2, echo=True}
+We have a look at the confusion matrix to look at the accuracy of the model.
+
+```{r Model2, echo=TRUE}
 pred_TS <- predict(RFmodel, TrainingSet)
 confusionMatrix(pred_TS, TrainingSet$classe)
 ```
 
-```{r Model3, echo=True}
+We get a very high accuracy of 99% but we still need to know how this model performs against the test set before expressing a conclusion.
+
+```{r Model3, echo=TRUE}
 pred_VS <- predict(RFmodel, ValidingSet)
 confusionMatrix(pred_VS, ValidingSet$classe)
 ```
+As we can see we still get a very high accuracy. We didn't overfit the model when training it
+so we use the random forest to make the prediction on the test set.
 
 ## PREDICTION
-```{r prediction, echo=True}
+
+```{r prediction, echo=TRUE}
 prediction <- predict(RFmodel, testingMOD)
 prediction
 ```
